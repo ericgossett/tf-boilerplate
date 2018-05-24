@@ -12,6 +12,10 @@ class TestModel(Model):
     def __init__(self, config):
         super(TestModel, self).__init__(config)
         self.model_constructor()
+        self.saver_init()
+
+    def saver_init(self):
+        self.saver = tf.train.Saver(max_to_keep=self.config['max_to_keep'])
 
     def model_constructor(self):
         n_layer_1 = 256 # 1st layer number of neurons
@@ -117,6 +121,7 @@ class TestTrain(Train):
             'accuracy': np.mean(accuracies)
         }
         self.logger.log(current_iteration, items_to_log)
+        self.model.save(self.sess)
 
     def batch_step(self):
         batch_x, batch_y = self.data.train.next_batch(
@@ -143,8 +148,10 @@ def main():
         'batch_size': 100,
         'iterations_per_batch': int(mnist.train.num_examples/100),
         'learning_rate': 0.001,
-        'max_epoch': 30,
-        'summary_dir': 'logs'
+        'max_epoch': 5,
+        'summary_dir': 'logs',
+        'save_dir': 'snapshots',
+        'max_to_keep': 5
     }
 
     sess = tf.Session()
@@ -152,6 +159,7 @@ def main():
     model = TestModel(config)
     logger.add_graph(sess.graph)
     trainer = TestTrain(sess, model, mnist, config, logger)
+    model.load(sess)
     trainer.train()
 
 if __name__ == '__main__':
