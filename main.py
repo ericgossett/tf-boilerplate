@@ -13,7 +13,7 @@ class TestModel(Model):
         super(TestModel, self).__init__(config)
         self.model_constructor()
         self.saver_init()
-
+    
     def saver_init(self):
         self.saver = tf.train.Saver(max_to_keep=self.config['max_to_keep'])
 
@@ -145,6 +145,7 @@ class TestTrain(Train):
 def main():
     mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
     config = {
+        'name': 'TestModel',
         'batch_size': 100,
         'iterations_per_batch': int(mnist.train.num_examples/100),
         'learning_rate': 0.001,

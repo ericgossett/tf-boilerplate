@@ -1,9 +1,17 @@
 import os
 import tensorflow as tf
+from .validators import config_validator
 
 class Logger:
+    """Logger for the model for Tensorboard visualization
+
+    Args:
+        sess (tf.Session): The current session.
+        config (dict): The configuration.
+    """
     def __init__(self, sess, config):
-        self.summary_dir = config['summary_dir']
+        config_validator(config)
+        self.summary_dir = config['summary_dir'] + '/' + config['name']
         self.sess = sess
         self.placeholders = {}
         self.ops = {}
@@ -15,6 +23,15 @@ class Logger:
         )
 
     def log(self, step, items_to_log, summary_type='train'):
+        """Creates a summary for each value defined in items_to_log
+
+        Args:
+            step (int): The current training step.
+            items_to_log (dict): List of items to start logging.
+            summary_type (String): The type of summary to write to. Options:
+            'train' or 'test'. Default: 'train'.
+
+        """
         summary_writer = (
             self.train_summary_writer if summary_type == 'train' else 
             self.test_summary_writer
@@ -60,6 +77,13 @@ class Logger:
         summary_writer.flush()
 
     def add_graph(self, graph, summary_type='train'):
+        """Adds graph to the summary writer
+
+        Args:
+            graph (tf.Graph): The graph to add. 
+            summary_type (String): The type of summary to write to. Options:
+            'train' or 'test'. Default: 'train'.    
+        """
         summary_writer = (
             self.train_summary_writer if summary_type == "train" else 
             self.test_summary_writer
