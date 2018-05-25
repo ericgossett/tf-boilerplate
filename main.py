@@ -5,12 +5,12 @@ from core.model import Model
 from core.train import Train
 from core.logger import Logger
 # Get MNIST dataset
-from tensorflow.examples.tutorials.mnist import input_data
+from mnist_loader import load_data
 
 
 class TestModel(Model):
-    def __init__(self, config):
-        super(TestModel, self).__init__(config)
+    def __init__(self, config, data):
+        super(TestModel, self).__init__(config, data)
         self.model_constructor()
         self.saver_init()
     
@@ -24,9 +24,9 @@ class TestModel(Model):
         n_classes = 10 # MNIST total classes (0-9 digits)
 
         with tf.name_scope('input'):
-            self.x = tf.placeholder(tf.float32, [None, n_input], name='x')
-            self.y = tf.placeholder(tf.float32, [None, n_classes], name='y')
-
+            batch_x, batch_y = self.data.get_next()
+            self.x = tf.cast(batch_x, tf.float32)
+            self.y = tf.cast(batch_y, tf.float32)
         # Build layers 
         with tf.name_scope('layer_1'):
             weights = tf.Variable(
@@ -124,30 +124,44 @@ class TestTrain(Train):
         self.model.save(self.sess)
 
     def batch_step(self):
-        batch_x, batch_y = self.data.train.next_batch(
-            self.config['batch_size']
-        )
-        feed_dict = {
-            self.model.x : batch_x,
-            self.model.y : batch_y
-        }
 
         _, loss, accuracy = self.sess.run([
                 self.model.optimizer,
                 self.model.cross_entropy,
                 self.model.accuracy
-            ],
-            feed_dict=feed_dict
+            ]
         )
 
         return loss, accuracy
 
 def main():
-    mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+    # mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+
+    train, test = tf.keras.datasets.mnist.load_data()
+    mnist_x, mnist_y = train
+    vec_mnist_y = []
+    for y in mnist_y:
+        vec = np.zeros((10))
+        vec[y] = 1.0
+        vec_mnist_y.append(vec)
+
+    mnist_x = mnist_x.reshape((60000, 784))
+    mnist_y = np.array(vec_mnist_y)
+
+    """
+    mnist = load_data()
+    mnist_x = np.array(mnist['train'][0])
+    mnist_y = np.array(mnist['train'][1])
+    print(mnist_x.shape)
+    """
+    data = tf.data.Dataset.from_tensor_slices((mnist_x, mnist_y))
+    data = data.batch(100).repeat()
+    data_it = data.make_one_shot_iterator()
+
     config = {
         'name': 'TestModel',
         'batch_size': 100,
-        'iterations_per_batch': int(mnist.train.num_examples/100),
+        'iterations_per_batch': int(len(mnist_x)/100),
         'learning_rate': 0.001,
         'max_epoch': 5,
         'summary_dir': 'logs',
@@ -157,11 +171,12 @@ def main():
 
     sess = tf.Session()
     logger = Logger(sess, config)
-    model = TestModel(config)
+    model = TestModel(config, data_it)
     logger.add_graph(sess.graph)
-    trainer = TestTrain(sess, model, mnist, config, logger)
+    trainer = TestTrain(sess, model, data_it, config, logger)
     model.load(sess)
     trainer.train()
+
 
 if __name__ == '__main__':
     main()

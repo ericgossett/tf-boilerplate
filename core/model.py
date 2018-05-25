@@ -11,9 +11,10 @@ class Model:
     Args:
         config (dict): The configuration.
     """
-    def __init__(self, config):
+    def __init__(self, config, data):
         config_validator(config)
         self.config = config
+        self.data = data
         self.name = self.config['name']
         self.saver = None
         with tf.variable_scope('global_step'):
