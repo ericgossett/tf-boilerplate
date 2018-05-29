@@ -2,32 +2,30 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 from core.model import Model
-from core.train import Train
+from core.trainer import Trainer
 from core.logger import Logger
-# Get MNIST dataset
-from mnist_loader import load_data
 
 
 class TestModel(Model):
-    def __init__(self, config, data):
-        super(TestModel, self).__init__(config, data)
+    def __init__(self, config):
+        super(TestModel, self).__init__(config)
         self.model_constructor()
         self.saver_init()
     
     def saver_init(self):
+        """This will be the same for every child of Model."""
         self.saver = tf.train.Saver(max_to_keep=self.config['max_to_keep'])
 
     def model_constructor(self):
+        """Constructs a simple MLP for the mnist dataset."""
         n_layer_1 = 256 # 1st layer number of neurons
         n_layer_2 = 256 # 2nd layer number of neurons
         n_input = 784 # MNIST data input (img shape: 28*28)
         n_classes = 10 # MNIST total classes (0-9 digits)
 
         with tf.name_scope('input'):
-            batch_x, batch_y = self.data.get_next()
-            self.x = tf.cast(batch_x, tf.float32)
-            self.y = tf.cast(batch_y, tf.float32)
-        # Build layers 
+            self.features, self.labels = self.data_iter.get_next()
+
         with tf.name_scope('layer_1'):
             weights = tf.Variable(
                 tf.random_normal([n_input, n_layer_1]),
@@ -39,7 +37,7 @@ class TestModel(Model):
             )
             layer_1 = tf.sigmoid(
                 tf.add(
-                    tf.matmul(self.x, weights),
+                    tf.matmul(self.features, weights),
                     bias
                 )
             )
@@ -76,34 +74,40 @@ class TestModel(Model):
                 )
             )
 
-        with tf.name_scope('loss'):
-            self.cross_entropy = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits_v2(
-                    labels=self.y,
-                    logits=output
-                )
-            )
-            self.optimizer = tf.train.AdamOptimizer(
-                self.config['learning_rate']
-            ).minimize(
-                self.cross_entropy,
-                global_step=self.global_step
-            )
-            pred = tf.nn.softmax(output)
-            correct_prediction = tf.equal(
-                tf.argmax(pred, 1),
-                tf.argmax(self.y, 1)
-            )
-            self.accuracy = tf.reduce_mean(
-                tf.cast(correct_prediction, tf.float32)
-            )
 
-class TestTrain(Train):
-    def __init__(self, sess, model, data, config, logger):
-        super(TestTrain, self).__init__(sess, model, data, config, logger)
+        self.cross_entropy = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits_v2(
+                labels=self.labels,
+                logits=output
+            )
+        )
 
-    def training_step(self):
-        batch_loop = tqdm(range(self.config['iterations_per_batch']))
+        self.optimizer = tf.train.AdamOptimizer(
+            self.config['learning_rate']
+        ).minimize(
+            self.cross_entropy,
+            global_step=self.global_step
+        )
+
+        self.pred = tf.nn.softmax(output)
+        correct_prediction = tf.equal(
+            tf.argmax(self.pred, 1),
+            tf.argmax(self.labels, 1)
+        )
+
+        self.accuracy = tf.reduce_mean(
+            tf.cast(correct_prediction, tf.float32)
+        )
+
+class TestTrainer(Trainer):
+    def __init__(self, sess, model, logger):
+        super(TestTrainer, self).__init__(sess, model, logger)
+
+    def epoch(self):
+        """The logic for a single epoch of training. Loops though the batches 
+        and logs the average loss and accuracy.
+        """
+        batch_loop = tqdm(range(self.model.config['iterations_per_epoch']))
         losses = []
         accuracies = []
         for _ in batch_loop:
@@ -111,6 +115,7 @@ class TestTrain(Train):
             losses.append(loss)
             accuracies.append(accuracy)
 
+        print('')
         print('cost: %f' % np.mean(losses))
         print('accuracy: %f \n' % np.mean(accuracies))
 
@@ -124,59 +129,76 @@ class TestTrain(Train):
         self.model.save(self.sess)
 
     def batch_step(self):
-
+        """Calculates the loss and accuracy per batch."""
         _, loss, accuracy = self.sess.run([
                 self.model.optimizer,
                 self.model.cross_entropy,
                 self.model.accuracy
             ]
         )
-
         return loss, accuracy
 
-def main():
-    # mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+    def predict(self, feature):
+        prediction = self.sess.run(
+            self.model.pred,
+            feed_dict={
+                self.model.features: [feature]
+            }
+        )
+        return np.argmax(prediction)
 
+def main():
+    # Load mnist dataset
     train, test = tf.keras.datasets.mnist.load_data()
+
+    # Build training set
     mnist_x, mnist_y = train
     vec_mnist_y = []
     for y in mnist_y:
         vec = np.zeros((10))
         vec[y] = 1.0
         vec_mnist_y.append(vec)
+    train_x = mnist_x.reshape((60000, 784)).astype(np.float32)
+    train_y = np.array(vec_mnist_y).astype(np.float32)
 
-    mnist_x = mnist_x.reshape((60000, 784))
-    mnist_y = np.array(vec_mnist_y)
-
-    """
-    mnist = load_data()
-    mnist_x = np.array(mnist['train'][0])
-    mnist_y = np.array(mnist['train'][1])
-    print(mnist_x.shape)
-    """
-    data = tf.data.Dataset.from_tensor_slices((mnist_x, mnist_y))
-    data = data.batch(100).repeat()
-    data_it = data.make_one_shot_iterator()
+    # Build test set
+    mnist_x, mnist_y = test
+    vec_mnist_y = []
+    for y in mnist_y:
+        vec = np.zeros((10))
+        vec[y] = 1.0
+        vec_mnist_y.append(vec)
+    test_x = mnist_x.reshape((mnist_x.shape[0], 784)).astype(np.float32)
+    test_y = np.array(vec_mnist_y).astype(np.float32)
 
     config = {
         'name': 'TestModel',
         'batch_size': 100,
-        'iterations_per_batch': int(len(mnist_x)/100),
+        'num_epochs': 10,
+        'iterations_per_epoch': int(len(train_x)/100),
         'learning_rate': 0.001,
-        'max_epoch': 5,
         'summary_dir': 'logs',
         'save_dir': 'snapshots',
         'max_to_keep': 5
     }
 
+    # Instantiate the session, logger, model and trainer
     sess = tf.Session()
     logger = Logger(sess, config)
-    model = TestModel(config, data_it)
+    model = TestModel(config)
+    trainer = TestTrainer(sess, model, logger)
+    # Visualize the graph in Tensorboard
     logger.add_graph(sess.graph)
-    trainer = TestTrain(sess, model, data_it, config, logger)
+    # Load the model if pre-trained
     model.load(sess)
-    trainer.train()
-
+    # Train
+    trainer.train(train_x, train_y)
+    # Test
+    trainer.test(test_x, test_y)
+    # Get a prediction for a single feature vector
+    prediction = trainer.predict(test_x[0])
+    print('prediction: ', prediction)
+    print('actual: ', np.argmax(test_y[0]))
 
 if __name__ == '__main__':
     main()

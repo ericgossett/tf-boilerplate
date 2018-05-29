@@ -11,10 +11,9 @@ class Model:
     Args:
         config (dict): The configuration.
     """
-    def __init__(self, config, data):
+    def __init__(self, config):
         config_validator(config)
         self.config = config
-        self.data = data
         self.name = self.config['name']
         self.saver = None
         with tf.variable_scope('global_step'):
@@ -24,6 +23,16 @@ class Model:
                 name='global_step'
             )
 
+        self.x = tf.placeholder(tf.float32)
+        self.y = tf.placeholder(tf.float32)
+
+        self.data = tf.data.Dataset.from_tensor_slices(
+            (self.x, self.y)
+        ).batch(
+            config['batch_size']
+        ).repeat()
+        self.data_iter = self.data.make_initializable_iterator()
+
     def model_constructor(self):
         """Abstract method used to define the model in the derived class."""
         raise NotImplementedError
@@ -31,13 +40,12 @@ class Model:
     def saver_init(self):
         """Abstract method used to initalize the saver in the derived class.
 
-        In the dervied class addd the following to the body:
+        In the dervied class add the following to the body:
 
         >>> self.saver = tf.train.Saver(max_to_keep=config['max_to_keep'])
 
         Then call this method in the derived classes constructor.
         """
-        # self.saver = tf.train.Saver(max_to_keep=config['max_to_keep'])
         raise NotImplementedError
 
     def save(self, sess):
@@ -57,7 +65,7 @@ class Model:
             self.name
         )
         self.saver.save(sess, save_dir + '/' + self.name, self.global_step)
-        print('Save completed.')
+        print('Save completed.\n')
 
     def load(self, sess):
         """loads the last snapshot of the model
@@ -76,5 +84,7 @@ class Model:
         )
         latest_checkpoint = tf.train.latest_checkpoint(save_dir)
         if latest_checkpoint:
-            print("Loading model checkpoint {} ...\n".format(latest_checkpoint))
+            print(
+                'Loading model checkpoint {} ...\n'.format(latest_checkpoint)
+            )
             self.saver.restore(sess, latest_checkpoint)

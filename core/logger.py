@@ -38,38 +38,39 @@ class Logger:
         )
         summary_list = []
         for key, val in items_to_log.items():
-            if key not in self.placeholders:
-                with tf.name_scope(key):
-                    if len(val.shape) <= 1:
-                        self.placeholders[key] = tf.placeholder(
-                            'float32',
-                            val.shape,
-                            name=key
-                        )
-                        self.ops[key] = tf.summary.scalar(
-                            'value',
-                            self.placeholders[key]
-                        )
-                        self.ops[key+'-hist'] = tf.summary.histogram(
-                            'histogram',
-                            self.placeholders[key]
-                        )
-                    else:
-                        self.placeholders[key] = tf.placeholder(
-                            'float32',
-                            [None] + list(val.shape[1:]),
-                            name=key
-                        )
-                        self.ops[key] = tf.summary.image(
-                            key,
-                            self.placeholders[key]
-                        ) 
+            placeholder_key = summary_type + '-' + key
+            if placeholder_key not in self.placeholders:
+                # with tf.name_scope(key):
+                if len(val.shape) <= 1:
+                    self.placeholders[placeholder_key] = tf.placeholder(
+                        'float32',
+                        val.shape,
+                        name=placeholder_key
+                    )
+                    self.ops[placeholder_key] = tf.summary.scalar(
+                        key,
+                        self.placeholders[placeholder_key]
+                    )
+                    self.ops[placeholder_key+'-hist'] = tf.summary.histogram(
+                        key + '-histogram',
+                        self.placeholders[placeholder_key]
+                    )
+                else:
+                    self.placeholders[placeholder_key] = tf.placeholder(
+                        'float32',
+                        [None] + list(val.shape[1:]),
+                        name=placeholder_key
+                    )
+                    self.ops[placeholder_key] = tf.summary.image(
+                        key,
+                        self.placeholders[placeholder_key]
+                    ) 
             summary_list.extend((
                 self.sess.run(
-                    self.ops[key], {self.placeholders[key]: val}
+                    self.ops[placeholder_key], {self.placeholders[placeholder_key]: val}
                 ),
                 self.sess.run(
-                    self.ops[key+'-hist'], {self.placeholders[key]: val}
+                    self.ops[placeholder_key+'-hist'], {self.placeholders[placeholder_key]: val}
                 )
             ))
         for summary in summary_list:

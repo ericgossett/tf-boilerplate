@@ -5,9 +5,9 @@ def config_validator(config):
     required_keys = [
         'name',
         'batch_size',
-        'iterations_per_batch',
+        'num_epochs',
+        'iterations_per_epoch',
         'learning_rate',
-        'max_epoch',
         'summary_dir',
         'save_dir',
         'max_to_keep'
