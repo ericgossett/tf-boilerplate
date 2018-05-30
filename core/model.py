@@ -37,17 +37,6 @@ class Model:
         """Abstract method used to define the model in the derived class."""
         raise NotImplementedError
 
-    def saver_init(self):
-        """Abstract method used to initalize the saver in the derived class.
-
-        In the dervied class add the following to the body:
-
-        >>> self.saver = tf.train.Saver(max_to_keep=config['max_to_keep'])
-
-        Then call this method in the derived classes constructor.
-        """
-        raise NotImplementedError
-
     def save(self, sess):
         """Saves a snapshot of the model
 
@@ -57,7 +46,9 @@ class Model:
         if self.saver is None:
             raise SaverNotInitialized((
                 'saver not defined, please make sure '
-                'saver_init() is called in the constructor.'
+                'self.saver = tf.train.Saver('
+                'max_to_keep=config[\'max_to_keep\']'
+                ') is in the constructor.'
             ))
         print('Saving model...')
         save_dir = os.path.join(
@@ -76,7 +67,9 @@ class Model:
         if self.saver is None:
             raise SaverNotInitialized((
                 'saver not defined, please make sure '
-                'saver_init() is called in the constructor.'
+                'self.saver = tf.train.Saver('
+                'max_to_keep=config[\'max_to_keep\']'
+                ') is in the constructor.'
             ))
         save_dir = os.path.join(
             self.config['save_dir'],

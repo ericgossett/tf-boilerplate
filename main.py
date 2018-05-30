@@ -10,12 +10,8 @@ class TestModel(Model):
     def __init__(self, config):
         super(TestModel, self).__init__(config)
         self.model_constructor()
-        self.saver_init()
-    
-    def saver_init(self):
-        """This will be the same for every child of Model."""
         self.saver = tf.train.Saver(max_to_keep=self.config['max_to_keep'])
-
+    
     def model_constructor(self):
         """Constructs a simple MLP for the mnist dataset."""
         n_layer_1 = 256 # 1st layer number of neurons
@@ -73,7 +69,6 @@ class TestModel(Model):
                     bias
                 )
             )
-
 
         self.cross_entropy = tf.reduce_mean(
             tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -174,7 +169,7 @@ def main():
     config = {
         'name': 'TestModel',
         'batch_size': 100,
-        'num_epochs': 10,
+        'num_epochs': 5,
         'iterations_per_epoch': int(len(train_x)/100),
         'learning_rate': 0.001,
         'summary_dir': 'logs',
