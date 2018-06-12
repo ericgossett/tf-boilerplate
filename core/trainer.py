@@ -71,14 +71,17 @@ class Trainer:
             print('test cost: ', loss)
             print('test accuracy: ', accuracy)
             current_iteration = self.model.global_step.eval(self.sess)
-            items_to_log = {
-                'cost': loss,
-                'accuracy': accuracy
-            }
             self.logger.log(
+                'cost',
+                loss,
                 current_iteration,
-                items_to_log,
-                summary_type='test'
+                training=False
+            )
+            self.logger.log(
+                'accuracy',
+                accuracy,
+                current_iteration,
+                training=False
             )
             self.model.save(self.sess)
 

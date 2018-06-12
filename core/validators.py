@@ -10,7 +10,7 @@ def config_validator(config):
         'learning_rate',
         'summary_dir',
         'save_dir',
-        'max_to_keep'
+        'saver_max_to_keep'
     ]
     for key in required_keys:
         if key not in config:

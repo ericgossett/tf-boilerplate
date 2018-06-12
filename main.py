@@ -10,7 +10,9 @@ class TestModel(Model):
     def __init__(self, config):
         super(TestModel, self).__init__(config)
         self.model_constructor()
-        self.saver = tf.train.Saver(max_to_keep=self.config['max_to_keep'])
+        self.saver = tf.train.Saver(
+            max_to_keep=self.config['saver_max_to_keep']
+        )
     
     def model_constructor(self):
         """Constructs a simple MLP for the mnist dataset."""
@@ -116,11 +118,16 @@ class TestTrainer(Trainer):
 
 
         current_iteration = self.model.global_step.eval(self.sess)
-        items_to_log = {
-            'cost': np.mean(losses),
-            'accuracy': np.mean(accuracies)
-        }
-        self.logger.log(current_iteration, items_to_log)
+        self.logger.log(
+            'cost',
+            np.mean(losses),
+            current_iteration
+        )
+        self.logger.log(
+            'accuracy',
+            np.mean(accuracies),
+            current_iteration
+        )
         self.model.save(self.sess)
 
     def batch_step(self):
@@ -174,7 +181,7 @@ def main():
         'learning_rate': 0.001,
         'summary_dir': 'logs',
         'save_dir': 'snapshots',
-        'max_to_keep': 5
+        'saver_max_to_keep': 5
     }
 
     # Instantiate the session, logger, model and trainer
@@ -182,14 +189,19 @@ def main():
     logger = Logger(sess, config)
     model = TestModel(config)
     trainer = TestTrainer(sess, model, logger)
+
     # Visualize the graph in Tensorboard
     logger.add_graph(sess.graph)
+
     # Load the model if pre-trained
     model.load(sess)
+
     # Train
     trainer.train(train_x, train_y)
+
     # Test
     trainer.test(test_x, test_y)
+    
     # Get a prediction for a single feature vector
     prediction = trainer.predict(test_x[0])
     print('prediction: ', prediction)

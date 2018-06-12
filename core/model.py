@@ -47,7 +47,7 @@ class Model:
             raise SaverNotInitialized((
                 'saver not defined, please make sure '
                 'self.saver = tf.train.Saver('
-                'max_to_keep=config[\'max_to_keep\']'
+                'max_to_keep=config[\'saver_max_to_keep\']'
                 ') is in the constructor.'
             ))
         print('Saving model...')
@@ -68,7 +68,7 @@ class Model:
             raise SaverNotInitialized((
                 'saver not defined, please make sure '
                 'self.saver = tf.train.Saver('
-                'max_to_keep=config[\'max_to_keep\']'
+                'max_to_keep=config[\'saver_max_to_keep\']'
                 ') is in the constructor.'
             ))
         save_dir = os.path.join(

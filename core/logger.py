@@ -13,8 +13,7 @@ class Logger:
         config_validator(config)
         self.summary_dir = config['summary_dir'] + '/' + config['name']
         self.sess = sess
-        self.placeholders = {}
-        self.ops = {}
+        self.logged_items = {}
         self.train_summary_writer = tf.summary.FileWriter(
             os.path.join(self.summary_dir, 'training')
         )
@@ -22,72 +21,61 @@ class Logger:
             os.path.join(self.summary_dir, 'testing')
         )
 
-    def log(self, step, items_to_log, summary_type='train'):
+    def log(self, name, value, step, is_image=False, training=True):
         """Creates a summary for each value defined in items_to_log
 
         Args:
+            name (string): The name of the item to log.
+            value (tensor): The value of the item to log.
             step (int): The current training step.
-            items_to_log (dict): List of items to start logging.
-            summary_type (String): The type of summary to write to. Options:
-            'train' or 'test'. Default: 'train'.
-
+            is_image (bool): Set to true if the item being logged is an image.
+            training (bool): Set false if logging for a test set.
         """
         summary_writer = (
-            self.train_summary_writer if summary_type == 'train' else 
+            self.train_summary_writer if training else 
             self.test_summary_writer
         )
-        summary_list = []
-        for key, val in items_to_log.items():
-            placeholder_key = summary_type + '-' + key
-            if placeholder_key not in self.placeholders:
-                # with tf.name_scope(key):
-                if len(val.shape) <= 1:
-                    self.placeholders[placeholder_key] = tf.placeholder(
-                        'float32',
-                        val.shape,
-                        name=placeholder_key
-                    )
-                    self.ops[placeholder_key] = tf.summary.scalar(
-                        key,
-                        self.placeholders[placeholder_key]
-                    )
-                    self.ops[placeholder_key+'-hist'] = tf.summary.histogram(
-                        key + '-histogram',
-                        self.placeholders[placeholder_key]
-                    )
-                else:
-                    self.placeholders[placeholder_key] = tf.placeholder(
-                        'float32',
-                        [None] + list(val.shape[1:]),
-                        name=placeholder_key
-                    )
-                    self.ops[placeholder_key] = tf.summary.image(
-                        key,
-                        self.placeholders[placeholder_key]
-                    ) 
-            summary_list.extend((
-                self.sess.run(
-                    self.ops[placeholder_key], {self.placeholders[placeholder_key]: val}
-                ),
-                self.sess.run(
-                    self.ops[placeholder_key+'-hist'], {self.placeholders[placeholder_key]: val}
+
+
+        logged_item_key = ('train' if training else 'test') + '-' + name
+        if logged_item_key not in self.logged_items:
+            placeholder = tf.placeholder(
+                'float32',
+                value.shape,
+                name=logged_item_key
+            )
+            summary_op = tf.summary.scalar(
+                name,
+                placeholder
+            )
+
+            if is_image:
+                placeholder = tf.placeholder(
+                    'float32',
+                    [None] + list(value.shape[1:]),
+                    name=logged_item_key
                 )
-            ))
-        for summary in summary_list:
-            summary_writer.add_summary(summary, step)
+                summary_op = tf.summary.image(
+                    name,
+                    placeholder
+                ) 
+
+            self.logged_items[logged_item_key] = (
+                summary_op,
+                placeholder
+            )
+
+        summary = self.sess.run(
+            self.logged_items[logged_item_key][0],
+            { self.logged_items[logged_item_key][1]: value }
+        )
+        summary_writer.add_summary(summary, step)
         summary_writer.flush()
 
-    def add_graph(self, graph, summary_type='train'):
+    def add_graph(self, graph):
         """Adds graph to the summary writer
 
         Args:
-            graph (tf.Graph): The graph to add. 
-            summary_type (String): The type of summary to write to. Options:
-            'train' or 'test'. Default: 'train'.    
+            graph (tf.Graph): The graph to add.  
         """
-        summary_writer = (
-            self.train_summary_writer if summary_type == "train" else 
-            self.test_summary_writer
-        )
-
-        summary_writer.add_graph(graph)
+        self.train_summary_writer.add_graph(graph)
